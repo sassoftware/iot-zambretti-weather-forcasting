@@ -1,0 +1,34 @@
+<url-connector>
+  <url-publishers>
+    <url-publisher name='weather'>
+      <requests>
+        <request name="weather">
+          <url><![CDATA[http://api.openweathermap.org/data/2.5/group?id=4861716,4180439,5368361,4930956,4164138,5128581,5809844,5391959,4671654,4887398,5861897,4853799&appid=41aa32f9affc8f2b30b6f1fa06a30a92&units=imperial]]></url>
+        </request>
+      </requests>
+      <generate>0</generate>
+      <opcode>insert</opcode>
+      <event-loops>
+        <event-loop-json name='loop'>
+          <use-json>#_content</use-json>
+          <json>$.list</json>
+          <function-context>
+            <functions>
+              <function name='id'>json(#_context,'id')</function>
+              <function name='name'>json(#_context,'name')</function>
+              <function name='dt'>json(#_context,'dt')</function>
+              <function name='weatherCond'>json(#_context,'weather.description')</function>
+              <function name='temp'>json(#_context,'main.temp')</function>
+              <function name='humidity'>json(#_context,'main.humidity')</function>
+              <function name='pressure'>json(#_context,'main.pressure')</function>
+              <function name='windSpeed'>json(#_context,'wind.speed')</function>
+              <function name='windDirection'>json(#_context,'wind.deg')</function>
+              <function name='lat'>json(#_context,'coord.lat')</function>
+              <function name='lon'>json(#_context,'coord.lon')</function>
+            </functions>
+          </function-context>
+        </event-loop-json>
+      </event-loops>
+    </url-publisher>
+  </url-publishers>
+</url-connector>

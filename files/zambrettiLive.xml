@@ -1,0 +1,318 @@
+<project name="zambrettiLive" pubsub="auto" threads="4" heartbeat-interval="1">
+  <metadata>
+    <meta id="studioUploadedBy">sasdemo</meta>
+    <meta id="studioUploaded">1585064482434</meta>
+    <meta id="studioModifiedBy">sasdemo</meta>
+    <meta id="studioModified">1586439458530</meta>
+    <meta id="layout">{"zam_cq":{"addElevations":{"x":15,"y":95},"computeMetrics":{"x":55,"y":220},"computePressSeaLevel":{"x":55,"y":360},"elevations":{"x":-290,"y":-35},"filterFalling":{"x":50,"y":510},"filterRising":{"x":-205,"y":505},"filterSteady":{"x":315,"y":510},"pressureFalling":{"x":50,"y":640},"pressureRising":{"x":-205,"y":635},"pressureSteady":{"x":320,"y":640},"unionZ":{"x":45,"y":805},"weather":{"x":35,"y":-50},"weatherData":{"x":55,"y":-70}}}</meta>
+  </metadata>
+  <contqueries>
+    <contquery name="zam_cq" trace="TotalVolume">
+      <windows>
+        <window-source pubsub="true" index="pi_EMPTY" insert-only="true" name="weather">
+          <schema>
+            <fields>
+              <field name="name" type="string" key="true"/>
+              <field name="dt" type="date"/>
+              <field name="weatherCond" type="string"/>
+              <field name="temp" type="double"/>
+              <field name="humidity" type="double"/>
+              <field name="pressure" type="double"/>
+              <field name="windSpeed" type="int64"/>
+              <field name="windDirection" type="int64"/>
+            </fields>
+          </schema>
+          <connectors>
+            <connector class="url" name="liveWeather">
+              <properties>
+                <property name="type"><![CDATA[pub]]></property>
+                <property name="interval"><![CDATA[3600]]></property>
+                <property name="properties"><![CDATA[APPID=@appid@]]></property>
+                <property name="configUrl"><![CDATA[file://@PROJDIR@/config.xml]]></property>
+              </properties>
+            </connector>
+            <connector class="fs" name="weatherIn">
+              <properties>
+                <property name="type"><![CDATA[sub]]></property>
+                <property name="dateformat"><![CDATA[%m/%d/%Y:%H:%M:%S]]></property>
+                <property name="snapshot"><![CDATA[false]]></property>
+                <property name="fsname"><![CDATA[@PROJDIR@/zambretti_input.csv]]></property>
+                <property name="fstype"><![CDATA[csv]]></property>
+              </properties>
+            </connector>
+          </connectors>
+        </window-source>
+        <window-source pubsub="true" index="pi_HASH" name="elevations">
+          <schema>
+            <fields>
+              <field name="name" type="string" key="true"/>
+              <field name="elevation" type="double"/>
+            </fields>
+          </schema>
+          <connectors>
+            <connector class="fs" name="New_Connector_1">
+              <properties>
+                <property name="type"><![CDATA[pub]]></property>
+                <property name="transactional"><![CDATA[false]]></property>
+                <property name="blocksize"><![CDATA[1024]]></property>
+                <property name="fsname"><![CDATA[@PROJDIR@/elevations.csv]]></property>
+                <property name="fstype"><![CDATA[csv]]></property>
+              </properties>
+            </connector>
+          </connectors>
+        </window-source>
+        <window-compute pubsub="true" index="pi_EMPTY" name="computeMetrics">
+          <description><![CDATA[Convert temp to tempC and elevation to elevationM. Calculate the Zwind factor as follows.
+
+If windDir is greater than or equal to 135 and less than or equal to 225, Zwind is 2. If windDir greater than or equal to 315 or less than or equal to 45, Zwind is 0. If windDir is anything else, Zwind is 1.]]></description>
+          <schema>
+            <fields>
+              <field name="name" type="string" key="true"/>
+              <field name="datetime" type="date"/>
+              <field name="temp" type="double"/>
+              <field name="tempC" type="double"/>
+              <field name="humidity" type="double"/>
+              <field name="pressure" type="double"/>
+              <field name="elevation" type="double"/>
+              <field name="elevationM" type="double"/>
+              <field name="Zwind" type="int64"/>
+            </fields>
+          </schema>
+          <output>
+            <field-expr><![CDATA[datetime]]></field-expr>
+            <field-expr><![CDATA[temp]]></field-expr>
+            <field-expr><![CDATA[(temp-32)*5/9]]></field-expr>
+            <field-expr><![CDATA[humidity]]></field-expr>
+            <field-expr><![CDATA[pressure]]></field-expr>
+            <field-expr><![CDATA[elevation]]></field-expr>
+            <field-expr><![CDATA[elevation*.3048]]></field-expr>
+            <field-expr><![CDATA[if (windDir >= 135) and (windDir <= 225) then return 2 else if (windDir >= 315) or (windDir <=45) then return 0 else return 1]]></field-expr>
+          </output>
+        </window-compute>
+        <window-compute pubsub="true" index="pi_EMPTY" output-insert-only="true" name="computePressSeaLevel">
+          <description><![CDATA[Use pressure, tempC, and elevationM to calculate the pressureSeaLevel field.]]></description>
+          <schema>
+            <fields>
+              <field name="name" type="string" key="true"/>
+              <field name="tempC" type="double"/>
+              <field name="elevationM" type="double"/>
+              <field name="pressure" type="double"/>
+              <field name="pressureSeaLevel" type="double"/>
+              <field name="datetime" type="date"/>
+              <field name="Zwind" type="int64"/>
+            </fields>
+          </schema>
+          <output>
+            <field-expr><![CDATA[tempC]]></field-expr>
+            <field-expr><![CDATA[elevationM]]></field-expr>
+            <field-expr><![CDATA[pressure]]></field-expr>
+            <field-expr><![CDATA[pressure]]></field-expr>
+            <field-expr><![CDATA[datetime]]></field-expr>
+            <field-expr><![CDATA[Zwind]]></field-expr>
+          </output>
+        </window-compute>
+        <window-pattern name="pressureFalling">
+          <description><![CDATA[Detect a pattern of pressureSeaLevel fallingby 1.6 mb in a 3 hour period.]]></description>
+          <schema>
+            <fields>
+              <field name="ID" type="int64" key="true"/>
+              <field name="name" type="string"/>
+              <field name="e1Datetime" type="date"/>
+              <field name="datetime" type="date"/>
+              <field name="pressureSeaLevel" type="double"/>
+              <field name="Z" type="int64"/>
+            </fields>
+          </schema>
+          <patterns>
+            <pattern name="pressureFalling" index="name">
+              <events>
+                <event name="e1" source="filterFalling"><![CDATA[p0==pressureSeaLevel]]></event>
+                <event name="e2" source="filterFalling"><![CDATA[p0>pressureSeaLevel + 1.6]]></event>
+              </events>
+              <logic><![CDATA[fby{10800 seconds}(e1,e2)]]></logic>
+              <output>
+                <field-selection name="name" node="e1"/>
+                <field-selection name="datetime" node="e1"/>
+                <field-selection name="datetime" node="e2"/>
+                <field-selection name="pressureSeaLevel" node="e2"/>
+                <field-expr node="e2"><![CDATA[floor(127 - 0.12 * pressureSeaLevel) + Zwind]]></field-expr>
+              </output>
+              <timefields>
+                <timefield source="filterFalling" field="datetime"/>
+              </timefields>
+            </pattern>
+          </patterns>
+        </window-pattern>
+        <window-pattern name="pressureRising">
+          <description><![CDATA[Detect a pattern of pressureSeaLevel rising by 1.6 mb in a 3 hour period.]]></description>
+          <schema>
+            <fields>
+              <field name="ID" type="int64" key="true"/>
+              <field name="name" type="string"/>
+              <field name="e1Datetime" type="date"/>
+              <field name="datetime" type="date"/>
+              <field name="pressureSeaLevel" type="double"/>
+              <field name="Z" type="int64"/>
+            </fields>
+          </schema>
+          <patterns>
+            <pattern name="patternRising" index="name">
+              <events>
+                <event name="e1" source="filterRising"><![CDATA[p0==pressureSeaLevel]]></event>
+                <event name="e2" source="filterRising"><![CDATA[p0<pressureSeaLevel-1.6]]></event>
+              </events>
+              <logic><![CDATA[fby{10800 seconds}(e1,e2)]]></logic>
+              <output>
+                <field-selection name="name" node="e1"/>
+                <field-selection name="datetime" node="e1"/>
+                <field-selection name="datetime" node="e2"/>
+                <field-selection name="pressureSeaLevel" node="e2"/>
+                <field-expr node="e2"><![CDATA[floor(185 - 0.16 * pressureSeaLevel) + Zwind]]></field-expr>
+              </output>
+              <timefields>
+                <timefield source="filterRising" field="datetime"/>
+              </timefields>
+            </pattern>
+          </patterns>
+        </window-pattern>
+        <window-filter pubsub="true" index="pi_EMPTY" name="filterFalling">
+          <description><![CDATA[Filter events with a pressureSeaLevel value not between 985 and 1050 mb.]]></description>
+          <expression><![CDATA[pressureSeaLevel >= 987 and pressureSeaLevel <= 1052]]></expression>
+        </window-filter>
+        <window-filter pubsub="true" index="pi_EMPTY" name="filterRising">
+          <description><![CDATA[Filter events with a pressureSeaLevel value not between 947 and 1030 mb.]]></description>
+          <expression><![CDATA[pressureSeaLevel >= 945 and pressureSeaLevel <= 1030]]></expression>
+        </window-filter>
+        <window-pattern name="pressureSteady">
+          <description><![CDATA[Detect a pattern of three pressureSeaLevel values not rising or falling by 1.6 mb in a 3 hour period.]]></description>
+          <schema>
+            <fields>
+              <field name="ID" type="int64" key="true"/>
+              <field name="name" type="string"/>
+              <field name="e1Datetime" type="date"/>
+              <field name="datetime" type="date"/>
+              <field name="pressureSeaLevel" type="double"/>
+              <field name="Z" type="int64"/>
+            </fields>
+          </schema>
+          <patterns>
+            <pattern name="patternSteady" index="name">
+              <events>
+                <event name="e1" source="filterSteady"><![CDATA[p0==pressureSeaLevel]]></event>
+                <event name="e2" source="filterSteady"><![CDATA[p0<pressureSeaLevel + 1.6 and p0>pressureSeaLevel - 1.6 and p1==pressureSeaLevel]]></event>
+                <event name="e3" source="filterSteady"><![CDATA[p0<pressureSeaLevel + 1.6 and p0>pressureSeaLevel - 1.6 and p1<pressureSeaLevel + 1.6 and p1>pressureSeaLevel - 1.6]]></event>
+              </events>
+              <logic><![CDATA[fby{10800 seconds}(e1,e2,e3)]]></logic>
+              <output>
+                <field-selection name="name" node="e1"/>
+                <field-selection name="datetime" node="e1"/>
+                <field-selection name="datetime" node="e3"/>
+                <field-selection name="pressureSeaLevel" node="e3"/>
+                <field-expr node="e3"><![CDATA[floor(144 - 0.13 * pressureSeaLevel) + Zwind]]></field-expr>
+              </output>
+              <timefields>
+                <timefield source="filterSteady" field="datetime"/>
+              </timefields>
+            </pattern>
+          </patterns>
+        </window-pattern>
+        <window-filter pubsub="true" index="pi_EMPTY" name="filterSteady">
+          <description><![CDATA[Filter events with a pressureSeaLevel value not between 960 and 1033 mb.]]></description>
+          <expression><![CDATA[pressureSeaLevel>=960 and pressureSeaLevel<=1033]]></expression>
+        </window-filter>
+        <window-union pubsub="true" strict="false" index="pi_EMPTY" name="unionZ">
+          <connectors>
+            <connector class="fs" name="Output">
+              <properties>
+                <property name="type"><![CDATA[sub]]></property>
+                <property name="dateformat"><![CDATA[%m/%d/%Y:%H:%M:%S]]></property>
+                <property name="snapshot"><![CDATA[true]]></property>
+                <property name="fsname"><![CDATA[@PROJDIR@/zambretti_out.csv]]></property>
+                <property name="fstype"><![CDATA[csv]]></property>
+              </properties>
+            </connector>
+          </connectors>
+        </window-union>
+        <window-join pubsub="true" index="pi_EMPTY" name="addElevations">
+          <join type="leftouter" no-regenerates="true">
+            <conditions>
+              <fields left="name" right="name"/>
+            </conditions>
+          </join>
+          <output>
+            <field-selection name="elevation" source="r_elevation"/>
+            <field-selection name="datetime" source="l_dt"/>
+            <field-selection name="temp" source="l_temp"/>
+            <field-selection name="humidity" source="l_humidity"/>
+            <field-selection name="pressure" source="l_pressure"/>
+            <field-selection name="windDir" source="l_windDirection"/>
+          </output>
+        </window-join>
+                <window-source pubsub="true" name="forecasts">
+	          <schema>
+	            <fields>
+	              <field name="Z" type="int64" key="true"/>
+	              <field name="condition" type="string"/>
+	            </fields>
+	          </schema>
+	          <connectors>
+	            <connector class="fs" name="New_Connector_2">
+	              <properties>
+	                <property name="type"><![CDATA[pub]]></property>
+	                <property name="fsname"><![CDATA[@PROJDIR@/conditions.csv]]></property>
+	                <property name="fstype"><![CDATA[csv]]></property>
+	              </properties>
+	            </connector>
+	          </connectors>
+	        </window-source>
+	        <window-join pubsub="true" index="pi_HASH" name="addForecasts">
+	          <join type="inner" left-index="pi_HASH">
+	            <conditions>
+	              <fields left="Z" right="Z"/>
+	            </conditions>
+	          </join>
+	          <output>
+	            <field-selection name="condition" source="r_condition"/>
+	            <field-selection name="datetime" source="l_datetime"/>
+	            <field-selection name="name" source="l_name"/>
+	            <field-selection name="Z" source="l_Z"/>
+	          </output>
+	        </window-join>
+	        <window-remove-state remove="deletes retentionUpdates retentionDeletes updateBlockDeletes" pubsub="true" name="removeState"/>
+	        <window-aggregate pubsub="true" name="aggLastOnly">
+	          <schema>
+	            <fields>
+	              <field name="condition" type="string"/>
+	              <field name="datetime" type="date"/>
+	              <field name="name" type="string" key="true"/>
+	            </fields>
+	          </schema>
+	          <output>
+	            <field-expr><![CDATA[ESP_aLast(condition)]]></field-expr>
+	            <field-expr><![CDATA[ESP_aLast(datetime)]]></field-expr>
+	          </output>
+	        </window-aggregate>
+
+      </windows>
+      <edges>
+        <edge source="computeMetrics" target="computePressSeaLevel"/>
+        <edge source="filterFalling" target="pressureFalling"/>
+        <edge source="filterRising" target="pressureRising"/>
+        <edge source="filterSteady" target="pressureSteady"/>
+        <edge source="computePressSeaLevel" target="filterRising"/>
+        <edge source="computePressSeaLevel" target="filterFalling"/>
+        <edge source="computePressSeaLevel" target="filterSteady"/>
+        <edge source="pressureSteady" target="unionZ"/>
+        <edge source="pressureFalling" target="unionZ"/>
+        <edge source="pressureRising" target="unionZ"/>
+        <edge source="weather" target="addElevations" role="left"/>
+        <edge source="elevations" target="addElevations" role="right"/>
+        <edge source="addElevations" target="computeMetrics"/>
+        <edge source="unionZ" target="removeState"/>
+        <edge source="removeState" target="addForecasts" role="left"/>
+        <edge source="forecasts" target="addForecasts" role="right"/>
+        <edge source="addForecasts" target="aggLastOnly"/>
+      </edges>
+    </contquery>
+  </contqueries>
+</project>
