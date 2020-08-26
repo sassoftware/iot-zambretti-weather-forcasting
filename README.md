@@ -10,7 +10,8 @@ Welcome to the Zambretti Algorithm for Weather Forecasting ESP example. In the E
 * How to rejoin a split stream using a [Union](https://go.documentation.sas.com/?cdcId=espcdc&cdcVersion=6.2&docsetId=espcreatewindows&docsetTarget=n0nqt12sgro7rnn1jfg4ql0qsafw.htm&locale=en) window
 * How to use a [Remove State](https://go.documentation.sas.com/?cdcId=espcdc&cdcVersion=6.2&docsetId=espcreatewindows&docsetTarget=p0usk3uf3bcnebn1m99g1jbvvhxu.htm&locale=en) window to convert Upsert events into Insert events
 
-![](videos/zambretti_algorithm.mp4) 
+[![Zambretti Algorithm for Weather Forecasting](/images/video.png)](https://nam02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fplayers.brightcove.net%2F3665946608001%2Fdefault_default%2Findex.html%3FvideoId%3D6175608609001&data=02%7C01%7CZeph.Stemle%40sas.com%7C61b4be0fa16b42f6fd8808d8325987ca%7Cb1c14d5c362545b3a4309552373a0c2f%7C0%7C0%7C637314707404167694&sdata=upiWQwQ89kr3jjGZiL8GHe6Do3VXzaFqDOqM0leKAGY%3D&reserved=0 "Zambretti Algorithm for Weather Forecasting")
+ 
 
 ### Zambretti Algorithm
 
