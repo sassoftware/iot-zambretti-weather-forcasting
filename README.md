@@ -1,5 +1,8 @@
 # Zambretti Algorithm for Weather Forecasting
 
+<img src="https://img.shields.io/badge/Category-Data%20Transformation-blue"> <img src="https://img.shields.io/badge/Sub--Category-Pattern,%20Union,%20Remove%20State-yellowgreen"> <img src="https://img.shields.io/badge/Difficulty-Intermediate-yellow"> <img src="https://img.shields.io/badge/Updated-Aug%202020-orange">
+
+
 ## Overview
 
 Welcome to the Zambretti Algorithm for Weather Forecasting ESP example. In the ESP model you will learn about various types of ESP windows and their functions including:
